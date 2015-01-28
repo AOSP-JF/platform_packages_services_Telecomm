@@ -89,5 +89,4 @@ public final class Timeouts {
         return get(contentResolver, "emergency_call_timeout_radio_off_millis",
                 60000L /* 1 minute */);
     }
-
 }
