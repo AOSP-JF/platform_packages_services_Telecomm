@@ -43,7 +43,6 @@ import android.telephony.TelephonyManager;
 import com.android.internal.telephony.CallStateException;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.telephony.TelephonyProperties;
-import com.android.internal.telephony.util.BlacklistUtils;
 import com.android.internal.util.IndentingPrintWriter;
 
 import java.util.Collection;
@@ -137,7 +136,6 @@ public final class CallsManager extends Call.ListenerBase {
     private final Context mContext;
     private final PhoneAccountRegistrar mPhoneAccountRegistrar;
     private final MissedCallNotifier mMissedCallNotifier;
-    private final BlacklistCallNotifier mBlacklistCallNotifier;
     private final SpamBlocker mCallerInfoBlocker;
     private final Set<Call> mLocallyDisconnectingCalls = new HashSet<>();
     private final Set<Call> mPendingCallsToDisconnect = new HashSet<>();
@@ -185,12 +183,10 @@ public final class CallsManager extends Call.ListenerBase {
      * Initializes the required Telecom components.
      */
      CallsManager(Context context, MissedCallNotifier missedCallNotifier,
-                  BlacklistCallNotifier blacklistCallNotifier,
                   PhoneAccountRegistrar phoneAccountRegistrar) {
         mContext = context;
         mPhoneAccountRegistrar = phoneAccountRegistrar;
         mMissedCallNotifier = missedCallNotifier;
-        mBlacklistCallNotifier = blacklistCallNotifier;
         StatusBarNotifier statusBarNotifier = new StatusBarNotifier(context, this);
         mWiredHeadsetManager = new WiredHeadsetManager(context);
         mCallAudioManager = new CallAudioManager(context, statusBarNotifier, mWiredHeadsetManager);
@@ -255,29 +251,17 @@ public final class CallsManager extends Call.ListenerBase {
     public void onSuccessfulIncomingCall(Call incomingCall) {
         Log.d(this, "onSuccessfulIncomingCall");
 
-        if (isCallBlacklisted(incomingCall)) {
-            mCallLogManager.logCall(incomingCall, Calls.BLACKLIST_TYPE);
-            incomingCall.setDisconnectCause(
-                    new DisconnectCause(android.telephony.DisconnectCause.CALL_BLACKLISTED));
-        } else if (mCallerInfoBlocker.shouldBlock(incomingCall.getNumber())) {
-            // TODO: show notification for blocked spam calls
-            // TODO: add unique call type for spam
-            mCallLogManager.logCall(incomingCall, Calls.BLACKLIST_TYPE);
-            incomingCall.setDisconnectCause(
-                    new DisconnectCause(android.telephony.DisconnectCause.CALL_BLACKLISTED));
+        setCallState(incomingCall, CallState.RINGING);
+        if (hasMaximumRingingCalls(incomingCall.getTargetPhoneAccount().getId())) {
+            incomingCall.reject(false, null);
+            // since the call was not added to the list of calls, we have to call the missed
+            // call notifier and the call logger manually.
+            mMissedCallNotifier.showMissedCallNotification(incomingCall);
+            mCallLogManager.logCall(incomingCall, Calls.MISSED_TYPE);
         } else {
-            setCallState(incomingCall, CallState.RINGING);
-            if (hasMaximumRingingCalls(incomingCall.getTargetPhoneAccount().getId())) {
-                incomingCall.reject(false, null);
-                // since the call was not added to the list of calls, we have to call the missed
-                // call notifier and the call logger manually.
-                mMissedCallNotifier.showMissedCallNotification(incomingCall);
-                mCallLogManager.logCall(incomingCall, Calls.MISSED_TYPE);
-            } else {
-                incomingCall.mIsActiveSub = true;
-                addCall(incomingCall);
-                setActiveSubscription(incomingCall.getTargetPhoneAccount().getId());
-            }
+            incomingCall.mIsActiveSub = true;
+            addCall(incomingCall);
+            setActiveSubscription(incomingCall.getTargetPhoneAccount().getId());
         }
     }
 
@@ -1395,14 +1379,6 @@ public final class CallsManager extends Call.ListenerBase {
     }
 
     /**
-     * Retrieves the {@link MissedCallNotifier}
-     * @return The {@link MissedCallNotifier}.
-     */
-    BlacklistCallNotifier getBlacklistCallNotifier() {
-        return mBlacklistCallNotifier;
-    }
-
-    /**
      * Adds the specified call to the main list of live calls.
      *
      * @param call The call to add.
@@ -2199,24 +2175,5 @@ public final class CallsManager extends Call.ListenerBase {
                 }
             }
         }
-    }
-
-    protected boolean isCallBlacklisted(Call c) {
-        final String number = c.getNumber();
-        if (number == null) {
-            return false;
-        }
-
-        // See if the number is in the blacklist
-        // Result is one of: MATCH_NONE, MATCH_LIST or MATCH_REGEX
-        int listType = BlacklistUtils.isListed(mContext, number, BlacklistUtils.BLOCK_CALLS);
-        if (listType != BlacklistUtils.MATCH_NONE) {
-            // We have a match, set the user and hang up the call and notify
-            Log.d(this, "Incoming call from " + number + " blocked.");
-            mBlacklistCallNotifier.notifyBlacklistedCall(number,
-                    c.getCreationTimeMillis(), listType);
-            return true;
-        }
-        return false;
     }
 }
