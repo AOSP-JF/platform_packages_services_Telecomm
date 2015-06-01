@@ -136,7 +136,6 @@ public final class CallsManager extends Call.ListenerBase {
     private final Context mContext;
     private final PhoneAccountRegistrar mPhoneAccountRegistrar;
     private final MissedCallNotifier mMissedCallNotifier;
-    private final SpamBlocker mCallerInfoBlocker;
     private final Set<Call> mLocallyDisconnectingCalls = new HashSet<>();
     private final Set<Call> mPendingCallsToDisconnect = new HashSet<>();
 
@@ -203,7 +202,6 @@ public final class CallsManager extends Call.ListenerBase {
         mConnectionServiceRepository = new ConnectionServiceRepository(mPhoneAccountRegistrar,
                 context);
         mInCallWakeLockController = new InCallWakeLockController(context, this);
-        mCallerInfoBlocker = new SpamBlocker(context);
 
         mListeners.add(statusBarNotifier);
         mListeners.add(mCallLogManager);
@@ -218,7 +216,6 @@ public final class CallsManager extends Call.ListenerBase {
         mListeners.add(mHeadsetMediaButton);
         mListeners.add(RespondViaSmsManager.getInstance());
         mListeners.add(mProximitySensorManager);
-        mListeners.add(mCallerInfoBlocker);
     }
 
     @Override

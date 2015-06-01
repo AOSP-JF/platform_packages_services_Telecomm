@@ -14,5 +14,10 @@ LOCAL_PRIVILEGED_MODULE := true
 
 LOCAL_PROGUARD_FLAGS := $(proguard.flags)
 
+# Workaround for "local variable type mismatch" error.
+LOCAL_DX_FLAGS += --no-locals
+
+include $(BUILD_PACKAGE)
+
 # Build the test package.
 include $(call all-makefiles-under,$(LOCAL_PATH))
