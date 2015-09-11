@@ -52,7 +52,8 @@ final class Ringer extends CallsManagerListenerBase {
     private final CallsManager mCallsManager;
     private final InCallTonePlayer.Factory mPlayerFactory;
     private final Context mContext;
-    private final Vibrator mVibrator;
+    private final SystemVibrator mVibrator;
+
     private InCallTonePlayer mCallWaitingPlayer;
     /**
      * Used to track the status of {@link #mVibrator} in the case of simultaneous incoming calls.
@@ -165,7 +166,7 @@ final class Ringer extends CallsManagerListenerBase {
                 Log.v(this, "startRingingOrCallWaiting, skipping because volume is 0");
             }
             if (shouldVibrate(mContext) && !mIsVibrating) {
-                mVibrator.vibrate(VIBRATION_PATTERN, VIBRATION_PATTERN_REPEAT,
+                mVibrator.vibrateLowPriority(VIBRATION_PATTERN, VIBRATION_PATTERN_REPEAT,
                         VIBRATION_ATTRIBUTES);
                 mIsVibrating = true;
             }
